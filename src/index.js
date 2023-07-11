@@ -11,17 +11,13 @@ const lightbox = new SimpleLightbox('.gallery a', {
   captionDelay: 250,
 });
 
-let page = 1;
+let page;
 let totalPage;
 let searchQueryValue;
 
 const form = document.querySelector('.search-form');
 const wrapper = document.querySelector('.gallery');
-const loadMoreBtn = document.querySelector('.load-more');
 
-loadMoreBtn.style.display = 'none';
-
-loadMoreBtn.addEventListener('click', onLoadMore);
 form.addEventListener('submit', onSearch);
 
 function onSearch(evt) {
@@ -32,41 +28,31 @@ function onSearch(evt) {
   if (!searchQueryValue) {
     return;
   }
-  loadMoreBtn.style.display = 'block';
+
+  page = 1;
+
   wrapper.innerHTML = '';
   renderContainer(searchQueryValue, page);
 }
 
-function onLoadMore() {
-  page += 1;
-  renderContainer(searchQueryValue, page);
-}
-
 async function renderContainer(value, page) {
-  const { hits, totalHits } = await fetchImages(value, page);
-  checkTotalPages(totalHits);
-  addEventListener('scroll', scroll);
-  
-  try {
-    wrapper.insertAdjacentHTML('beforeend', generateContentList(hits));
-    addEventListener('scroll', scroll);
-    lightbox.refresh();
-    
+    try {
+    const { hits, totalHits } = await fetchImages(value, page);
+    checkTotalPages(totalHits);
+
     if (totalHits === 0) {
       Notify.failure(
         'Sorry, there are no images matching your search query. Please try again.'
       );
       return;
-    }
-    
-    if (page >= totalPage) {
-      loadMoreBtn.style.display = 'none';
-      Notify.warning(
-        "We're sorry, but you've reached the end of search results."
-      );
     } else if (page === 1) {
       Notify.info(`Hooray! We found ${totalHits} images.`);
     }
+
+    wrapper.insertAdjacentHTML('beforeend', generateContentList(hits));
+    window.addEventListener('scroll', scroll);
+    lightbox.refresh();
+
   } catch (error) {
     console.log(error);
   }
@@ -75,16 +61,28 @@ async function renderContainer(value, page) {
 function checkTotalPages(totalHits) {
   totalPage = Math.ceil(totalHits / 40);
 }
+
 function scroll() {
     const contentHeight = wrapper.offsetHeight - 500;
     const yOffset = window.pageYOffset;
     const viewportHeight = window.innerHeight;
     const scrolledHeight = yOffset + viewportHeight;
-   
+  
     if (scrolledHeight >= contentHeight) {
-        page += 1;
-        window.removeEventListener('scroll', scroll);
-        renderContainer(searchQueryValue, page);
+      page += 1;
+      window.removeEventListener('scroll', scroll);
+  
+      if (page > totalPage) {
+        Notify.warning(
+          "We're sorry, but you've reached the end of search results."
+        );
+        return;
+      }
+  
+      renderContainer(searchQueryValue, page).then(() => {
+        window.addEventListener('scroll', scroll);
+      });
     }
   }
+  
   
